@@ -1,0 +1,1962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Quest to Design Materials with Machines</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #08081a;
+    --bg2: #0e0e2a;
+    --accent: #00d4ff;
+    --accent2: #7b61ff;
+    --success: #44ff88;
+    --danger: #ff4466;
+    --warn: #ffaa33;
+    --text: #e8e8f0;
+    --text-dim: #8888aa;
+    --glass: rgba(255,255,255,0.04);
+    --glass-border: rgba(255,255,255,0.08);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    cursor: default;
+    user-select: none;
+  }
+
+  #app {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+  }
+
+  .scene {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    transform: translateX(40px);
+    padding: 40px;
+  }
+
+  .scene.active {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateX(0);
+  }
+
+  .scene.exit-left {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+
+  .scene canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .scene-content {
+    position: relative;
+    z-index: 2;
+    max-width: 1100px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    height: 100%;
+    justify-content: center;
+  }
+
+  .scene-title {
+    font-size: clamp(28px, 4vw, 52px);
+    font-weight: 700;
+    letter-spacing: -1px;
+    text-align: center;
+    line-height: 1.15;
+  }
+
+  .scene-subtitle {
+    font-size: clamp(14px, 1.8vw, 20px);
+    color: var(--text-dim);
+    text-align: center;
+    max-width: 700px;
+    line-height: 1.5;
+    font-weight: 300;
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-2 {
+    background: linear-gradient(135deg, var(--success), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-3 {
+    background: linear-gradient(135deg, var(--warn), var(--danger));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Navigation */
+  #nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 24px 20px;
+    background: linear-gradient(transparent, rgba(8,8,26,0.95));
+  }
+
+  .nav-dots {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .nav-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    padding: 0;
+  }
+
+  .nav-dot:hover { background: rgba(255,255,255,0.4); transform: scale(1.3); }
+  .nav-dot.active { background: var(--accent); box-shadow: 0 0 12px var(--accent); transform: scale(1.2); }
+
+  .nav-arrow {
+    background: none;
+    border: 1px solid var(--glass-border);
+    color: var(--text);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all 0.2s;
+    margin: 0 16px;
+  }
+
+  .nav-arrow:hover { background: var(--glass); border-color: var(--accent); color: var(--accent); }
+  .nav-arrow:disabled { opacity: 0.2; cursor: default; }
+
+  /* Progress bar */
+  #progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.5s ease;
+    z-index: 101;
+  }
+
+  /* Scene label */
+  #scene-label {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    z-index: 100;
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0.6;
+  }
+
+  /* Interactive elements */
+  .btn {
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    backdrop-filter: blur(8px);
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.08); }
+  .btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.12); }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+  /* Cards */
+  .card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 20px;
+    backdrop-filter: blur(12px);
+  }
+
+  /* Split layout */
+  .split {
+    display: flex;
+    gap: 40px;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .split > div { flex: 1; min-width: 280px; max-width: 500px; }
+
+  /* Timeline */
+  .timeline {
+    display: flex;
+    gap: 0;
+    align-items: center;
+    justify-content: center;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .timeline-item {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .timeline-node {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  .timeline-node:hover, .timeline-node.lit {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 16px rgba(0,212,255,0.2);
+  }
+
+  .timeline-arrow {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin: 0 4px;
+    opacity: 0.4;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: rgba(14,14,42,0.95);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    max-width: 250px;
+    pointer-events: none;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.2s;
+    backdrop-filter: blur(12px);
+    line-height: 1.4;
+  }
+
+  .tooltip.show { opacity: 1; }
+
+  /* Bar chart */
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 200px;
+    padding: 0 10px;
+    width: 100%;
+    max-width: 700px;
+  }
+
+  .bar-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+
+  .bar {
+    width: 100%;
+    max-width: 60px;
+    border-radius: 4px 4px 0 0;
+    transition: height 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    min-height: 2px;
+  }
+
+  .bar-label {
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    text-align: center;
+    writing-mode: horizontal-tb;
+  }
+
+  .bar-value {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+  }
+
+  /* Canvas overlay for interactive scenes */
+  .canvas-container {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    aspect-ratio: 4/3;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    background: rgba(0,0,0,0.3);
+  }
+
+  .canvas-container canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Convergence diagram */
+  .convergence {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 800px;
+  }
+
+  .thread-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    transition: all 0.4s;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  .thread-row.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .thread-row:hover {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.05);
+  }
+
+  .thread-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .thread-label {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .thread-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .merge-arrow {
+    text-align: center;
+    font-size: 24px;
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity 0.6s;
+  }
+
+  .merge-arrow.visible { opacity: 1; }
+
+  .result-box {
+    text-align: center;
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid var(--accent);
+    background: rgba(0,212,255,0.05);
+    opacity: 0;
+    transform: scale(0.9);
+    transition: all 0.6s;
+  }
+
+  .result-box.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* Pipeline diagram */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    max-width: 900px;
+    justify-content: center;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 10px 0;
+  }
+
+  .pipe-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    min-width: 90px;
+    transition: all 0.4s;
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  .pipe-block.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .pipe-block.highlight {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(0,212,255,0.15);
+  }
+
+  .pipe-icon { font-size: 24px; }
+  .pipe-label { font-size: 11px; font-weight: 500; text-align: center; }
+  .pipe-arrow { color: var(--text-dim); font-size: 18px; opacity: 0; transition: opacity 0.4s; padding: 0 2px; }
+  .pipe-arrow.visible { opacity: 0.5; }
+
+  /* Clique visualization */
+  .clique-bar {
+    display: flex;
+    width: 100%;
+    max-width: 600px;
+    height: 50px;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--glass-border);
+  }
+
+  .clique-segment {
+    flex: 1;
+    transition: all 0.3s;
+    cursor: pointer;
+    position: relative;
+    opacity: 0.7;
+  }
+
+  .clique-segment:hover {
+    opacity: 1;
+    filter: brightness(1.3);
+  }
+
+  .clique-segment.active {
+    opacity: 1;
+    filter: brightness(1.5);
+  }
+
+  /* Typewriter text */
+  .typewriter { font-family: 'JetBrains Mono', monospace; }
+
+  /* Landscape modes */
+  .mode-toggle {
+    display: flex;
+    gap: 2px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 2px;
+  }
+
+  .mode-btn {
+    padding: 6px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+
+  .mode-btn.active {
+    background: var(--glass);
+    color: var(--text);
+  }
+
+  /* Comparison columns */
+  .compare-cols {
+    display: flex;
+    gap: 32px;
+    width: 100%;
+    max-width: 800px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .compare-col {
+    flex: 1;
+    min-width: 250px;
+    text-align: center;
+  }
+
+  .compare-col h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+
+  @media (max-width: 768px) {
+    .scene { padding: 20px; padding-bottom: 60px; }
+    .split { flex-direction: column; gap: 20px; }
+    .pipeline { flex-wrap: wrap; }
+    .bar-chart { height: 150px; }
+    .canvas-container { aspect-ratio: 1; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="progress"></div>
+  <div id="scene-label"></div>
+
+  <!-- Scene 0: Title -->
+  <div class="scene active" id="scene-0">
+    <canvas id="bg-canvas-0"></canvas>
+    <div class="scene-content">
+      <div style="font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim);font-family:'JetBrains Mono',monospace">An Interactive Exploration</div>
+      <h1 class="scene-title">Designing Materials<br>with <span class="gradient-text">Machines</span></h1>
+      <p class="scene-subtitle">How AI learned to search 10<sup>60</sup> possible crystals for the ones that matter</p>
+      <div style="margin-top:24px;display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px">
+        <span>Press</span>
+        <span style="padding:3px 10px;border:1px solid var(--glass-border);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">→</span>
+        <span>to begin</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 1: The Problem -->
+  <div class="scene" id="scene-1">
+    <canvas id="bg-canvas-1"></canvas>
+    <div class="scene-content">
+      <h1 class="scene-title">The <span class="gradient-text-3">Impossible</span> Search</h1>
+      <p class="scene-subtitle">A crystal material is atoms arranged in a repeating 3D lattice. There are roughly <strong style="color:var(--accent)">10<sup>60</sup></strong> possible arrangements — more than atoms in the observable universe.</p>
+      <div style="display:flex;gap:20px;margin-top:8px;flex-wrap:wrap;justify-content:center">
+        <div class="card" style="text-align:center;min-width:140px">
+          <div style="font-size:28px;font-weight:700;color:var(--danger)" id="unstable-counter">99.9%</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Unstable / Useless</div>
+        </div>
+        <div class="card" style="text-align:center;min-width:140px">
+          <div style="font-size:28px;font-weight:700;color:var(--success)">~0.001%</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Stable & Useful</div>
+        </div>
+      </div>
+      <p class="scene-subtitle" style="margin-top:8px;font-size:14px">And computing the properties of just <em>one</em> takes hours on a supercomputer.</p>
+    </div>
+  </div>
+
+  <!-- Scene 2: What is a Crystal -->
+  <div class="scene" id="scene-2">
+    <div class="scene-content">
+      <h1 class="scene-title" style="font-size:clamp(22px,3vw,36px)">What is a <span class="gradient-text">Crystal</span>?</h1>
+      <div class="split">
+        <div>
+          <div class="canvas-container" id="crystal-container">
+            <canvas id="crystal-canvas"></canvas>
+          </div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn active" onclick="setCrystalMode('cell')">Unit Cell</button>
+            <button class="btn" onclick="setCrystalMode('periodic')">Periodic Lattice</button>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="card">
+              <div style="font-size:13px;font-weight:600;color:var(--accent)">LATTICE</div>
+              <div style="font-size:12px;color:var(--text-dim);margin-top:4px">3 lengths (a, b, c) + 3 angles (α, β, γ) define the repeating box</div>
+            </div>
+            <div class="card">
+              <div style="font-size:13px;font-weight:600;color:var(--accent2)">ATOMS</div>
+              <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Element type + position inside the box. These are the <em>local inputs</em>.</div>
+            </div>
+            <div class="card">
+              <div style="font-size:13px;font-weight:600;color:var(--success)">PROPERTIES</div>
+              <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Band gap, energy, conductivity — <em>global</em> quantities that emerge from the whole infinite structure</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 3: Structure vs Properties -->
+  <div class="scene" id="scene-3">
+    <div class="scene-content">
+      <h1 class="scene-title" style="font-size:clamp(22px,3vw,36px)">The <span class="gradient-text">Forward</span> Problem</h1>
+      <div class="split" style="max-width:800px">
+        <div style="text-align:center">
+          <div class="card" style="padding:24px">
+            <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:10px">STRUCTURE (Local)</div>
+            <div style="font-size:40px;margin-bottom:8px">🔷</div>
+            <div style="font-size:12px;color:var(--text-dim)">Atom types, positions,<br>lattice parameters</div>
+          </div>
+        </div>
+        <div style="text-align:center;flex:0;min-width:auto">
+          <div id="dft-arrow" style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <div style="font-size:24px;color:var(--accent)" id="arrow-anim">→</div>
+            <div style="font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace">DFT</div>
+            <div style="font-size:10px;color:var(--danger)">⏱ hours–days</div>
+          </div>
+          <div style="margin-top:20px;display:flex;flex-direction:column;align-items:center;gap:4px;opacity:0.5">
+            <div style="font-size:24px;color:var(--text-dim)">←</div>
+            <div style="font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace">???</div>
+            <div style="font-size:10px;color:var(--warn)">the inverse problem</div>
+          </div>
+        </div>
+        <div style="text-align:center">
+          <div class="card" style="padding:24px">
+            <div style="font-size:14px;font-weight:600;color:var(--success);margin-bottom:10px">PROPERTIES (Global)</div>
+            <div id="prop-display" style="display:flex;flex-direction:column;gap:8px;font-family:'JetBrains Mono',monospace;font-size:13px">
+              <div>Band Gap: <span style="color:var(--accent)">1.4 eV</span></div>
+              <div>Energy: <span style="color:var(--success)">-0.3 eV/atom</span></div>
+              <div>Type: <span style="color:var(--warn)">Semiconductor</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="scene-subtitle" style="font-size:14px;margin-top:12px">Properties emerge from quantum mechanics acting on the <em>entire</em> infinite lattice.<br>They're not in any single atom — they're everywhere and nowhere.</p>
+    </div>
+  </div>
+
+  <!-- Scene 4: Thread 1 - GNNs -->
+  <div class="scene" id="scene-4">
+    <div class="scene-content">
+      <h1 class="scene-title" style="font-size:clamp(20px,3vw,32px)">Thread 1: Learning to <span class="gradient-text">Predict</span></h1>
+      <p class="scene-subtitle" style="font-size:14px">Graph Neural Networks learn to predict properties from structure — <strong style="color:var(--accent)">1000x faster</strong> than DFT</p>
+      <div class="canvas-container" style="max-width:700px;aspect-ratio:16/8">
+        <canvas id="gnn-canvas"></canvas>
+      </div>
+      <div class="timeline" id="gnn-timeline">
+        <div class="timeline-item"><div class="timeline-node" data-tip="Continuous-filter convolutions for atoms">SchNet '17</div></div>
+        <div class="timeline-item"><span class="timeline-arrow">→</span><div class="timeline-node" data-tip="First GNN for periodic crystals">CGCNN '18</div></div>
+        <div class="timeline-item"><span class="timeline-arrow">→</span><div class="timeline-node" data-tip="Added global state attributes">MEGNet '19</div></div>
+        <div class="timeline-item"><span class="timeline-arrow">→</span><div class="timeline-node" data-tip="Angular information via line graphs">ALIGNN '21</div></div>
+        <div class="timeline-item"><span class="timeline-arrow">→</span><div class="timeline-node" data-tip="Universal potential for 89 elements">M3GNet '22</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px">Result: cheap, accurate property evaluation — the prerequisite for search</div>
+    </div>
+  </div>
+
+  <!-- Scene 5: Thread 2 - Generative -->
+  <div class="scene" id="scene-5">
+    <div class="scene-content">
+      <h1 class="scene-title" style="font-size:clamp(20px,3vw,32px)">Thread 2: Learning to <span class="gradient-text-2">Generate</span></h1>
+      <p class="scene-subtitle" style="font-size:14px">From noise to crystal — diffusion and flow models learn to dream new materials</p>
+      <div class="canvas-container" style="max-width:600px;aspect-ratio:4/3">
+        <canvas id="gen-canvas"></canvas>
+      </div>
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn" onclick="restartGeneration()">⟳ Generate New</button>
+      </div>
+      <div class="timeline" id="gen-timeline">
+        <div class="timeline-item"><div class="timeline-node" data-tip="First complete crystal generator + MP-20 benchmark">CDVAE '22</div></div>
+        <div class="timeline-item"><span class="timeline-arrow">→</span><div class="timeline-node" data-tip="Fractional coordinates + periodic diffusion">DiffCSP '23</div></div>
+        <div class="timeline-item"><span class="timeline-arrow">→</span><div class="timeline-node" data-tip="Riemannian flow matching on torus">FlowMM '24</div></div>
+        <div class="timeline-item"><span class="timeline-arrow">→</span><div class="timeline-node" data-tip="Industrial-scale, property-conditional generation">MatterGen '25</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--warn);margin-top:4px">But: these models sample <em>typical</em> materials, not exceptional ones</div>
+    </div>
+  </div>
+
+  <!-- Scene 6: Thread 3 - Optimization -->
+  <div class="scene" id="scene-6">
+    <div class="scene-content">
+      <h1 class="scene-title" style="font-size:clamp(20px,3vw,32px)">Thread 3: <span class="gradient-text-3">Optimization</span>, Not Sampling</h1>
+      <div class="canvas-container" style="max-width:650px;aspect-ratio:16/10">
+        <canvas id="landscape-canvas"></canvas>
+      </div>
+      <div class="mode-toggle" style="margin-top:8px">
+        <button class="mode-btn active" onclick="setLandscapeMode('sample')">Sampling</button>
+        <button class="mode-btn" onclick="setLandscapeMode('optimize')">Naive Optimize</button>
+        <button class="mode-btn" onclick="setLandscapeMode('conservative')">Conservative</button>
+      </div>
+      <div id="landscape-desc" style="font-size:13px;color:var(--text-dim);margin-top:6px;text-align:center;max-width:500px">
+        Generative models <strong style="color:var(--accent)">sample</strong> near training data — they reproduce the known distribution
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 7: Convergence -->
+  <div class="scene" id="scene-7">
+    <div class="scene-content" style="justify-content:center">
+      <h1 class="scene-title" style="font-size:clamp(20px,3vw,32px)">The Convergence: <span class="gradient-text">CliqueFlowmer</span></h1>
+      <div class="convergence" id="convergence-diagram">
+        <div class="thread-row" data-delay="0">
+          <div class="thread-icon" style="background:rgba(0,212,255,0.15);color:var(--accent)">📊</div>
+          <div>
+            <div class="thread-label">Thread 1: Property Predictors</div>
+            <div class="thread-desc">GNNs as cheap, fast oracles (MEGNet for band gap, M3GNet for energy)</div>
+          </div>
+        </div>
+        <div class="thread-row" data-delay="300">
+          <div class="thread-icon" style="background:rgba(68,255,136,0.15);color:var(--success)">🔮</div>
+          <div>
+            <div class="thread-label">Thread 2: Crystal Encoders / Decoders</div>
+            <div class="thread-desc">Encode variable-size crystals → fixed latent vector → decode back</div>
+          </div>
+        </div>
+        <div class="thread-row" data-delay="600">
+          <div class="thread-icon" style="background:rgba(255,170,51,0.15);color:var(--warn)">🎯</div>
+          <div>
+            <div class="thread-label">Thread 3: Clique-Based MBO</div>
+            <div class="thread-desc">Decompose latent space into overlapping cliques → combinatorial stitching</div>
+          </div>
+        </div>
+        <div class="merge-arrow" id="merge-arrow">⬇</div>
+        <div class="result-box" id="result-box">
+          <div style="font-size:18px;font-weight:600;margin-bottom:6px" class="gradient-text">Encode → Optimize → Decode</div>
+          <div style="font-size:13px;color:var(--text-dim)">Embed any crystal in a fixed latent space. Optimize there. Decode back to a real structure.</div>
+        </div>
+      </div>
+      <!-- Pipeline -->
+      <div class="pipeline" id="pipeline" style="margin-top:14px">
+        <div class="pipe-block" data-delay="1200"><div class="pipe-icon">🔷</div><div class="pipe-label">Crystal</div></div>
+        <div class="pipe-arrow" data-delay="1400">→</div>
+        <div class="pipe-block" data-delay="1500"><div class="pipe-icon">📦</div><div class="pipe-label">Encoder</div></div>
+        <div class="pipe-arrow" data-delay="1700">→</div>
+        <div class="pipe-block highlight" data-delay="1800"><div class="pipe-icon">🧬</div><div class="pipe-label">Latent<br>Cliques</div></div>
+        <div class="pipe-arrow" data-delay="2000">→</div>
+        <div class="pipe-block" data-delay="2100"><div class="pipe-icon">🔄</div><div class="pipe-label">Evolution<br>Strategies</div></div>
+        <div class="pipe-arrow" data-delay="2300">→</div>
+        <div class="pipe-block" data-delay="2400"><div class="pipe-icon">🔓</div><div class="pipe-label">Decoder</div></div>
+        <div class="pipe-arrow" data-delay="2600">→</div>
+        <div class="pipe-block" data-delay="2700"><div class="pipe-icon">✨</div><div class="pipe-label">Optimized<br>Crystal</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 8: Results -->
+  <div class="scene" id="scene-8">
+    <div class="scene-content">
+      <h1 class="scene-title" style="font-size:clamp(20px,3vw,32px)">Generation <span class="gradient-text-3">≠</span> Optimization</h1>
+      <div class="btn-row" style="margin-bottom:8px">
+        <button class="btn active" onclick="setResultMetric('energy')">Formation Energy ↓</button>
+        <button class="btn" onclick="setResultMetric('bandgap')">Band Gap ↓</button>
+      </div>
+      <div style="width:100%;max-width:700px">
+        <div class="bar-chart" id="result-chart"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-dim);padding:0 10px">
+          <span>← Better (lower)</span>
+          <span>Worse (higher) →</span>
+        </div>
+      </div>
+      <div id="result-insight" style="font-size:14px;text-align:center;margin-top:12px;max-width:600px;color:var(--text-dim)">
+        Generative models cluster around <span style="color:var(--warn)">0.6</span>. CliqueFlowmer reaches <span style="color:var(--success)">−0.99</span> — materials more stable than their raw elements.
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 9: Frontier -->
+  <div class="scene" id="scene-9">
+    <canvas id="bg-canvas-9"></canvas>
+    <div class="scene-content">
+      <h1 class="scene-title">The <span class="gradient-text">Frontier</span></h1>
+      <p class="scene-subtitle">The search continues. The best materials are still undiscovered.</p>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:12px">
+        <div class="card" style="max-width:220px;cursor:pointer;transition:all 0.3s" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--glass-border)'">
+          <div style="font-size:24px;margin-bottom:8px">🔬</div>
+          <div style="font-size:14px;font-weight:500">Better Oracles</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Universal predictors beyond energy and band gap — catalysis, conductivity, hardness</div>
+        </div>
+        <div class="card" style="max-width:220px;cursor:pointer;transition:all 0.3s" onmouseenter="this.style.borderColor='var(--accent2)'" onmouseleave="this.style.borderColor='var(--glass-border)'">
+          <div style="font-size:24px;margin-bottom:8px">⚖️</div>
+          <div style="font-size:14px;font-weight:500">Multi-Objective</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Optimize cost + conductivity + durability + safety simultaneously via Pareto frontiers</div>
+        </div>
+        <div class="card" style="max-width:220px;cursor:pointer;transition:all 0.3s" onmouseenter="this.style.borderColor='var(--success)'" onmouseleave="this.style.borderColor='var(--glass-border)'">
+          <div style="font-size:24px;margin-bottom:8px">🔄</div>
+          <div style="font-size:14px;font-weight:500">Closing the Loop</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Generate → DFT validate → retrain → repeat. Each cycle pushes the frontier forward.</div>
+        </div>
+      </div>
+      <div style="margin-top:32px;text-align:center">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:clamp(16px,2.5vw,28px);color:var(--accent);opacity:0.8">
+          10<sup>60</sup> possibilities. The map is getting better.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <div id="nav">
+    <button class="nav-arrow" id="nav-prev" onclick="goScene(currentScene-1)">←</button>
+    <div class="nav-dots" id="nav-dots"></div>
+    <button class="nav-arrow" id="nav-next" onclick="goScene(currentScene+1)">→</button>
+  </div>
+
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip"></div>
+</div>
+
+<script>
+// ============================================
+// SCENE MANAGER
+// ============================================
+const TOTAL_SCENES = 10;
+let currentScene = 0;
+let transitioning = false;
+const sceneLabels = [
+  '', 'THE PROBLEM', 'CRYSTALS 101', 'STRUCTURE → PROPERTIES',
+  'THREAD 1: PREDICT', 'THREAD 2: GENERATE', 'THREAD 3: OPTIMIZE',
+  'CONVERGENCE', 'RESULTS', 'THE FRONTIER'
+];
+
+// Build nav dots
+const dotsContainer = document.getElementById('nav-dots');
+for (let i = 0; i < TOTAL_SCENES; i++) {
+  const dot = document.createElement('button');
+  dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+  dot.onclick = () => goScene(i);
+  dotsContainer.appendChild(dot);
+}
+
+function goScene(idx) {
+  if (idx < 0 || idx >= TOTAL_SCENES || idx === currentScene || transitioning) return;
+  transitioning = true;
+  const dir = idx > currentScene ? 1 : -1;
+  const oldEl = document.getElementById('scene-' + currentScene);
+  const newEl = document.getElementById('scene-' + idx);
+
+  // Exit old
+  oldEl.classList.remove('active');
+  oldEl.classList.add(dir > 0 ? 'exit-left' : '');
+  oldEl.style.transform = dir > 0 ? 'translateX(-40px)' : 'translateX(40px)';
+
+  // Enter new
+  newEl.style.transform = dir > 0 ? 'translateX(40px)' : 'translateX(-40px)';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      newEl.classList.add('active');
+      newEl.style.transform = '';
+    });
+  });
+
+  // Update nav
+  document.querySelectorAll('.nav-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+  document.getElementById('nav-prev').disabled = idx === 0;
+  document.getElementById('nav-next').disabled = idx === TOTAL_SCENES - 1;
+  document.getElementById('progress').style.width = (idx / (TOTAL_SCENES - 1) * 100) + '%';
+  document.getElementById('scene-label').textContent = sceneLabels[idx];
+
+  const oldScene = currentScene;
+  currentScene = idx;
+
+  // Scene lifecycle
+  exitScene(oldScene);
+  setTimeout(() => {
+    oldEl.classList.remove('exit-left');
+    enterScene(idx);
+    transitioning = false;
+  }, 400);
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'd') goScene(currentScene + 1);
+  if (e.key === 'ArrowLeft' || e.key === 'a') goScene(currentScene - 1);
+  if (e.key >= '1' && e.key <= '9') goScene(parseInt(e.key) - 1);
+  if (e.key === '0') goScene(9);
+});
+
+// Touch swipe
+let touchStartX = 0;
+document.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
+document.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 60) goScene(currentScene + (dx < 0 ? 1 : -1));
+});
+
+// Tooltip
+const tooltip = document.getElementById('tooltip');
+document.querySelectorAll('[data-tip]').forEach(el => {
+  el.addEventListener('mouseenter', e => {
+    tooltip.textContent = el.dataset.tip;
+    tooltip.classList.add('show');
+    const r = el.getBoundingClientRect();
+    tooltip.style.left = r.left + r.width/2 - 100 + 'px';
+    tooltip.style.top = r.top - 50 + 'px';
+  });
+  el.addEventListener('mouseleave', () => tooltip.classList.remove('show'));
+});
+
+// ============================================
+// ANIMATION INFRASTRUCTURE
+// ============================================
+let animFrameId = null;
+const activeAnimations = new Set();
+
+function startAnimation(id, fn) {
+  activeAnimations.add(id);
+  const loop = (t) => {
+    if (!activeAnimations.has(id)) return;
+    fn(t);
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
+function stopAnimation(id) {
+  activeAnimations.delete(id);
+}
+
+function getCtx(canvasId, container) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+  const parent = container ? document.getElementById(container) : canvas.parentElement;
+  const rect = parent.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.W = rect.width;
+  ctx.H = rect.height;
+  return ctx;
+}
+
+// ============================================
+// SCENE 0: Title particles
+// ============================================
+function scene0Enter() {
+  const ctx = getCtx('bg-canvas-0');
+  if (!ctx) return;
+  const particles = [];
+  for (let i = 0; i < 80; i++) {
+    particles.push({
+      x: Math.random() * ctx.W, y: Math.random() * ctx.H,
+      vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 2 + 0.5,
+      a: Math.random() * 0.3 + 0.1
+    });
+  }
+  startAnimation('scene0', () => {
+    ctx.clearRect(0, 0, ctx.W, ctx.H);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = ctx.W; if (p.x > ctx.W) p.x = 0;
+      if (p.y < 0) p.y = ctx.H; if (p.y > ctx.H) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0,212,255,${p.a})`;
+      ctx.fill();
+    });
+    // Draw connections
+    ctx.strokeStyle = 'rgba(0,212,255,0.04)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        if (dx*dx + dy*dy < 12000) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+  });
+}
+
+// ============================================
+// SCENE 1: Impossible Search - flying cards
+// ============================================
+function scene1Enter() {
+  const ctx = getCtx('bg-canvas-1');
+  if (!ctx) return;
+  const cards = [];
+  const spawnCard = () => ({
+    x: ctx.W/2 + (Math.random()-0.5)*20,
+    y: ctx.H/2 + (Math.random()-0.5)*20,
+    z: 30,
+    vx: (Math.random()-0.5)*2,
+    vy: (Math.random()-0.5)*1.5,
+    w: 30 + Math.random()*20,
+    h: 20 + Math.random()*15,
+    stable: Math.random() < 0.008,
+    rot: Math.random() * Math.PI
+  });
+  for (let i = 0; i < 60; i++) {
+    const c = spawnCard();
+    c.z = Math.random() * 30;
+    cards.push(c);
+  }
+
+  startAnimation('scene1', (t) => {
+    ctx.clearRect(0, 0, ctx.W, ctx.H);
+    if (Math.random() < 0.3) cards.push(spawnCard());
+
+    for (let i = cards.length - 1; i >= 0; i--) {
+      const c = cards[i];
+      c.z -= 0.15;
+      c.x += c.vx * (1 + (30-c.z)*0.1);
+      c.y += c.vy * (1 + (30-c.z)*0.05);
+      c.rot += 0.005;
+
+      if (c.z < 0.5 || c.x < -100 || c.x > ctx.W+100 || c.y < -100 || c.y > ctx.H+100) {
+        cards.splice(i, 1);
+        continue;
+      }
+
+      const scale = (30 - c.z) / 30 * 2 + 0.1;
+      const alpha = Math.min(1, (30 - c.z) / 10) * 0.5;
+
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.rot);
+      ctx.scale(scale, scale);
+      ctx.globalAlpha = alpha;
+
+      const color = c.stable ? 'rgba(68,255,136,0.6)' : 'rgba(255,68,102,0.15)';
+      const border = c.stable ? 'rgba(68,255,136,0.8)' : 'rgba(255,68,102,0.25)';
+      ctx.fillStyle = color;
+      ctx.strokeStyle = border;
+      ctx.lineWidth = 0.5;
+      ctx.fillRect(-c.w/2, -c.h/2, c.w, c.h);
+      ctx.strokeRect(-c.w/2, -c.h/2, c.w, c.h);
+
+      // Little grid pattern
+      ctx.strokeStyle = c.stable ? 'rgba(68,255,136,0.3)' : 'rgba(255,255,255,0.05)';
+      ctx.lineWidth = 0.3;
+      for (let gx = -c.w/2+5; gx < c.w/2; gx += 5) {
+        ctx.beginPath(); ctx.moveTo(gx, -c.h/2); ctx.lineTo(gx, c.h/2); ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    // Limit cards
+    while (cards.length > 120) cards.shift();
+  });
+}
+
+// ============================================
+// SCENE 2: Crystal visualization
+// ============================================
+let crystalMode = 'cell';
+let crystalAngle = { x: 0.4, y: 0.6 };
+let crystalDrag = false;
+let crystalLastMouse = { x: 0, y: 0 };
+
+function setCrystalMode(mode) {
+  crystalMode = mode;
+  document.querySelectorAll('#scene-2 .btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(mode === 'cell' ? 'unit' : 'periodic')));
+}
+
+function project3D(x, y, z, cx, cy, ax, ay) {
+  // Rotate around Y then X
+  let x1 = x * Math.cos(ay) - z * Math.sin(ay);
+  let z1 = x * Math.sin(ay) + z * Math.cos(ay);
+  let y1 = y * Math.cos(ax) - z1 * Math.sin(ax);
+  let z2 = y * Math.sin(ax) + z1 * Math.cos(ax);
+  const scale = 300 / (300 + z2);
+  return { x: cx + x1 * scale, y: cy + y1 * scale, z: z2, scale };
+}
+
+function scene2Enter() {
+  const container = document.getElementById('crystal-container');
+  const canvas = document.getElementById('crystal-canvas');
+  const rect = container.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  const cx = W/2, cy = H/2;
+
+  // Unit cell: simple cubic with 4 atoms
+  const lattice = 60; // scale
+  const atoms = [
+    { x: 0, y: 0, z: 0, color: '#00d4ff', r: 8, el: 'Si' },
+    { x: 1, y: 0, z: 0, color: '#ff6688', r: 6, el: 'O' },
+    { x: 0, y: 1, z: 0, color: '#ff6688', r: 6, el: 'O' },
+    { x: 0.5, y: 0.5, z: 0.5, color: '#44ff88', r: 7, el: 'Ti' },
+  ];
+
+  const edges = [
+    [0,0,0,1,0,0],[0,0,0,0,1,0],[0,0,0,0,0,1],
+    [1,0,0,1,1,0],[1,0,0,1,0,1],[0,1,0,1,1,0],
+    [0,1,0,0,1,1],[0,0,1,1,0,1],[0,0,1,0,1,1],
+    [1,1,0,1,1,1],[1,0,1,1,1,1],[0,1,1,1,1,1]
+  ];
+
+  canvas.addEventListener('mousedown', e => { crystalDrag = true; crystalLastMouse = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener('mousemove', e => {
+    if (!crystalDrag) return;
+    crystalAngle.y += (e.clientX - crystalLastMouse.x) * 0.005;
+    crystalAngle.x += (e.clientY - crystalLastMouse.y) * 0.005;
+    crystalLastMouse = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener('mouseup', () => crystalDrag = false);
+  canvas.addEventListener('mouseleave', () => crystalDrag = false);
+
+  startAnimation('scene2', (t) => {
+    if (!crystalDrag) {
+      crystalAngle.y += 0.003;
+    }
+    ctx.clearRect(0, 0, W, H);
+
+    const copies = crystalMode === 'periodic' ? [-1,0,1] : [0];
+    const allAtoms = [];
+    const allEdges = [];
+
+    copies.forEach(dx => copies.forEach(dy => copies.forEach(dz => {
+      const ghost = dx !== 0 || dy !== 0 || dz !== 0;
+      const alpha = ghost ? 0.2 : 0.8;
+
+      // Edges
+      edges.forEach(([x1,y1,z1,x2,y2,z2]) => {
+        const p1 = project3D((x1+dx-0.5)*lattice, (y1+dy-0.5)*lattice, (z1+dz-0.5)*lattice, cx, cy, crystalAngle.x, crystalAngle.y);
+        const p2 = project3D((x2+dx-0.5)*lattice, (y2+dy-0.5)*lattice, (z2+dz-0.5)*lattice, cx, cy, crystalAngle.x, crystalAngle.y);
+        allEdges.push({ p1, p2, alpha });
+      });
+
+      // Atoms
+      atoms.forEach(a => {
+        const p = project3D((a.x+dx-0.5)*lattice, (a.y+dy-0.5)*lattice, (a.z+dz-0.5)*lattice, cx, cy, crystalAngle.x, crystalAngle.y);
+        allAtoms.push({ ...p, color: a.color, r: a.r * p.scale, alpha, el: a.el });
+      });
+    })));
+
+    // Draw edges
+    allEdges.forEach(({ p1, p2, alpha }) => {
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.3})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+
+    // Sort atoms by z for depth
+    allAtoms.sort((a, b) => a.z - b.z);
+    allAtoms.forEach(a => {
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+      ctx.globalAlpha = a.alpha;
+      ctx.fillStyle = a.color;
+      ctx.fill();
+      ctx.globalAlpha = a.alpha * 0.5;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+  });
+}
+
+// ============================================
+// SCENE 4: GNN visualization
+// ============================================
+function scene4Enter() {
+  const container = document.querySelector('#scene-4 .canvas-container');
+  const canvas = document.getElementById('gnn-canvas');
+  const rect = container.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+
+  // Crystal graph nodes
+  const graphNodes = [
+    { x: 80, y: H*0.3, color: '#00d4ff', label: 'Si' },
+    { x: 60, y: H*0.65, color: '#ff6688', label: 'O' },
+    { x: 120, y: H*0.55, color: '#44ff88', label: 'Ti' },
+    { x: 100, y: H*0.8, color: '#ff6688', label: 'O' },
+  ];
+  const graphEdges = [[0,1],[0,2],[1,2],[1,3],[2,3]];
+
+  // GNN layers
+  const layers = 3;
+  const layerX = [W*0.3, W*0.45, W*0.6];
+  const layerNodes = layerX.map(lx => [
+    { x: lx, y: H*0.25 },
+    { x: lx, y: H*0.45 },
+    { x: lx, y: H*0.65 },
+    { x: lx, y: H*0.85 },
+  ]);
+
+  // Output
+  const outputNode = { x: W*0.82, y: H*0.5 };
+
+  // Messages (animated dots)
+  const messages = [];
+  let lastSpawn = 0;
+
+  startAnimation('scene4', (t) => {
+    ctx.clearRect(0, 0, W, H);
+
+    // Labels
+    ctx.font = '11px JetBrains Mono';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.textAlign = 'center';
+    ctx.fillText('Crystal Graph', 90, 18);
+    ctx.fillText('Message Passing Layers', W*0.45, 18);
+    ctx.fillText('Output', W*0.82, 18);
+
+    // Draw crystal graph edges
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    graphEdges.forEach(([i,j]) => {
+      ctx.beginPath();
+      ctx.moveTo(graphNodes[i].x, graphNodes[i].y);
+      ctx.lineTo(graphNodes[j].x, graphNodes[j].y);
+      ctx.stroke();
+    });
+
+    // Crystal graph nodes
+    graphNodes.forEach(n => {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 12, 0, Math.PI*2);
+      ctx.fillStyle = n.color;
+      ctx.globalAlpha = 0.8;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.font = '9px JetBrains Mono';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.label, n.x, n.y+3);
+    });
+
+    // GNN layer connections
+    for (let l = 0; l < layers; l++) {
+      const nodes = layerNodes[l];
+      // Intra-layer edges (sparse)
+      const intraEdges = [[0,1],[1,2],[2,3],[0,2]];
+      ctx.strokeStyle = 'rgba(0,212,255,0.08)';
+      intraEdges.forEach(([i,j]) => {
+        ctx.beginPath();
+        ctx.moveTo(nodes[i].x, nodes[i].y);
+        ctx.lineTo(nodes[j].x, nodes[j].y);
+        ctx.stroke();
+      });
+
+      // Cross-layer edges
+      if (l > 0) {
+        const prev = layerNodes[l-1];
+        ctx.strokeStyle = 'rgba(0,212,255,0.06)';
+        for (let i = 0; i < 4; i++) {
+          ctx.beginPath();
+          ctx.moveTo(prev[i].x, prev[i].y);
+          ctx.lineTo(nodes[i].x, nodes[i].y);
+          ctx.stroke();
+        }
+      }
+
+      // Layer nodes
+      nodes.forEach((n, ni) => {
+        const pulse = Math.sin(t/300 + l + ni) * 0.15 + 0.85;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 8, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(0,212,255,${0.3 * pulse})`;
+        ctx.fill();
+        ctx.strokeStyle = `rgba(0,212,255,${0.5 * pulse})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+    }
+
+    // Connect last layer to output
+    layerNodes[2].forEach(n => {
+      ctx.beginPath();
+      ctx.moveTo(n.x, n.y);
+      ctx.lineTo(outputNode.x, outputNode.y);
+      ctx.strokeStyle = 'rgba(68,255,136,0.1)';
+      ctx.stroke();
+    });
+
+    // Input connections
+    graphNodes.forEach((gn, gi) => {
+      ctx.beginPath();
+      ctx.moveTo(gn.x, gn.y);
+      ctx.lineTo(layerNodes[0][gi].x, layerNodes[0][gi].y);
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.stroke();
+    });
+
+    // Output node
+    const outPulse = Math.sin(t/400) * 0.2 + 0.8;
+    ctx.beginPath();
+    ctx.arc(outputNode.x, outputNode.y, 18, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(68,255,136,${0.2 * outPulse})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(68,255,136,${0.6 * outPulse})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = '11px JetBrains Mono';
+    ctx.fillStyle = '#44ff88';
+    ctx.textAlign = 'center';
+    ctx.fillText('1.42 eV', outputNode.x, outputNode.y + 4);
+
+    // Animated message dots
+    if (t - lastSpawn > 400) {
+      lastSpawn = t;
+      const layer = Math.floor(Math.random() * 3);
+      const from = Math.floor(Math.random() * 4);
+      let to = Math.floor(Math.random() * 4);
+      if (layer < 3) {
+        const edges = [[0,1],[1,2],[2,3],[0,2]];
+        const e = edges[Math.floor(Math.random()*edges.length)];
+        const src = layerNodes[layer][e[0]];
+        const dst = layerNodes[layer][e[1]];
+        messages.push({ sx: src.x, sy: src.y, dx: dst.x, dy: dst.y, t: 0, life: 40 });
+      }
+    }
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      m.t++;
+      if (m.t > m.life) { messages.splice(i, 1); continue; }
+      const prog = m.t / m.life;
+      const mx = m.sx + (m.dx - m.sx) * prog;
+      const my = m.sy + (m.dy - m.sy) * prog;
+      ctx.beginPath();
+      ctx.arc(mx, my, 3, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(0,212,255,${1 - prog})`;
+      ctx.fill();
+    }
+  });
+
+  // Light up timeline
+  const nodes = document.querySelectorAll('#gnn-timeline .timeline-node');
+  nodes.forEach((n, i) => setTimeout(() => n.classList.add('lit'), i * 400));
+}
+
+// ============================================
+// SCENE 5: Generation animation
+// ============================================
+let genStartTime = 0;
+
+function restartGeneration() { genStartTime = performance.now(); }
+
+function scene5Enter() {
+  const container = document.querySelector('#scene-5 .canvas-container');
+  const canvas = document.getElementById('gen-canvas');
+  const rect = container.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+
+  // Target crystal positions (simple cubic)
+  const targetAtoms = [];
+  const gridN = 4;
+  const spacing = Math.min(W, H) * 0.15;
+  const ox = W/2 - (gridN-1)*spacing/2;
+  const oy = H/2 - (gridN-1)*spacing/2;
+  for (let i = 0; i < gridN; i++) {
+    for (let j = 0; j < gridN; j++) {
+      targetAtoms.push({
+        tx: ox + i * spacing + (j%2)*spacing*0.3,
+        ty: oy + j * spacing + (i%2)*spacing*0.2,
+        color: (i+j)%3 === 0 ? '#00d4ff' : (i+j)%3 === 1 ? '#ff6688' : '#44ff88',
+        r: (i+j)%3 === 0 ? 8 : 6,
+      });
+    }
+  }
+
+  // Random starting positions
+  let particles = targetAtoms.map(a => ({
+    ...a,
+    x: Math.random() * W,
+    y: Math.random() * H,
+  }));
+
+  genStartTime = performance.now();
+
+  startAnimation('scene5', (t) => {
+    ctx.clearRect(0, 0, W, H);
+    const elapsed = (t - genStartTime) / 1000;
+    const progress = Math.min(1, elapsed / 4); // 4 second animation
+    const ease = 1 - Math.pow(1 - progress, 3); // cubic ease out
+
+    // Draw flow lines
+    if (progress < 0.95) {
+      ctx.globalAlpha = 0.15 * (1 - progress);
+      particles.forEach(p => {
+        const dx = p.tx - p.x;
+        const dy = p.ty - p.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len > 5) {
+          ctx.beginPath();
+          ctx.moveTo(p.x + (p.tx-p.x)*ease, p.y + (p.ty-p.y)*ease);
+          const arrowLen = Math.min(20, len * (1-ease));
+          ctx.lineTo(
+            p.x + (p.tx-p.x)*ease + dx/len * arrowLen,
+            p.y + (p.ty-p.y)*ease + dy/len * arrowLen
+          );
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw bonds when close to target
+    if (progress > 0.5) {
+      const bondAlpha = (progress - 0.5) * 2;
+      ctx.strokeStyle = `rgba(255,255,255,${bondAlpha * 0.12})`;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i+1; j < particles.length; j++) {
+          const pi = particles[i], pj = particles[j];
+          const px1 = pi.x + (pi.tx - pi.x) * ease;
+          const py1 = pi.y + (pi.ty - pi.y) * ease;
+          const px2 = pj.x + (pj.tx - pj.x) * ease;
+          const py2 = pj.y + (pj.ty - pj.y) * ease;
+          const d = Math.hypot(px1-px2, py1-py2);
+          if (d < spacing * 1.2) {
+            ctx.beginPath();
+            ctx.moveTo(px1, py1);
+            ctx.lineTo(px2, py2);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // Draw particles
+    particles.forEach(p => {
+      const px = p.x + (p.tx - p.x) * ease;
+      const py = p.y + (p.ty - p.y) * ease;
+      // Noise during transition
+      const noise = (1 - ease) * 8;
+      const nx = px + (Math.sin(t/200 + p.tx) * noise);
+      const ny = py + (Math.cos(t/250 + p.ty) * noise);
+
+      ctx.beginPath();
+      ctx.arc(nx, ny, p.r, 0, Math.PI*2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = 0.4 + ease * 0.5;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
+    // Phase label
+    ctx.font = '12px JetBrains Mono';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.textAlign = 'center';
+    if (progress < 0.3) ctx.fillText('noise', W/2, 24);
+    else if (progress < 0.7) ctx.fillText('denoising...', W/2, 24);
+    else ctx.fillText('crystal', W/2, 24);
+
+    // Progress bar
+    ctx.fillStyle = 'rgba(0,212,255,0.3)';
+    ctx.fillRect(W*0.2, H-16, (W*0.6) * progress, 3);
+  });
+
+  // Timeline
+  const nodes = document.querySelectorAll('#gen-timeline .timeline-node');
+  nodes.forEach((n, i) => setTimeout(() => n.classList.add('lit'), i * 400));
+}
+
+// ============================================
+// SCENE 6: Optimization landscape
+// ============================================
+let landscapeMode = 'sample';
+
+function setLandscapeMode(mode) {
+  landscapeMode = mode;
+  document.querySelectorAll('#scene-6 .mode-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(mode === 'sample' ? 'sampling' : mode === 'optimize' ? 'naive' : 'conservative')));
+  const desc = document.getElementById('landscape-desc');
+  if (mode === 'sample') desc.innerHTML = 'Generative models <strong style="color:var(--accent)">sample</strong> near training data — they reproduce the known distribution';
+  else if (mode === 'optimize') desc.innerHTML = 'Naive optimization follows gradients <strong style="color:var(--danger)">off-distribution</strong> into adversarial regions — high predicted score, physically meaningless';
+  else desc.innerHTML = 'Conservative optimization <strong style="color:var(--success)">stays near data</strong> while finding the best designs within the reliable region';
+}
+
+function scene6Enter() {
+  const container = document.querySelector('#scene-6 .canvas-container');
+  const canvas = document.getElementById('landscape-canvas');
+  const rect = container.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+
+  // Height function
+  function height(x, y) {
+    const nx = x/W, ny = y/H;
+    return (Math.sin(nx*6+1)*Math.cos(ny*5+2)*0.3 +
+            Math.sin(nx*3-ny*2)*0.4 +
+            Math.exp(-((nx-0.7)**2+(ny-0.3)**2)*8)*0.5 +
+            Math.exp(-((nx-0.2)**2+(ny-0.6)**2)*12)*0.3);
+  }
+
+  // Training data points (clustered in middle)
+  const dataPoints = [];
+  for (let i = 0; i < 30; i++) {
+    const x = W*0.25 + Math.random()*W*0.4;
+    const y = H*0.25 + Math.random()*H*0.5;
+    dataPoints.push({ x, y, h: height(x, y) });
+  }
+
+  // Sample points (new each frame)
+  let samplePoints = [];
+  let optimTrajectory = [];
+  let conservTrajectory = [];
+  let trajectoryBuilt = false;
+
+  function buildTrajectories() {
+    // Naive: gradient ascent from center, goes off distribution
+    optimTrajectory = [{ x: W*0.4, y: H*0.5 }];
+    let ox = W*0.4, oy = H*0.5;
+    for (let i = 0; i < 30; i++) {
+      const dx = (height(ox+2, oy) - height(ox-2, oy)) * 15;
+      const dy = (height(ox, oy+2) - height(ox, oy-2)) * 15;
+      ox += dx; oy += dy;
+      ox = Math.max(10, Math.min(W-10, ox));
+      oy = Math.max(10, Math.min(H-10, oy));
+      optimTrajectory.push({ x: ox, y: oy });
+    }
+
+    // Conservative: stays near data, finds best nearby
+    conservTrajectory = [{ x: W*0.35, y: H*0.45 }];
+    let cx = W*0.35, cy = H*0.45;
+    for (let i = 0; i < 20; i++) {
+      const dx = (height(cx+2, cy) - height(cx-2, cy)) * 8;
+      const dy = (height(cx, cy+2) - height(cx, cy-2)) * 8;
+      // Pull toward data center
+      const pullX = (W*0.4 - cx) * 0.02;
+      const pullY = (H*0.45 - cy) * 0.02;
+      cx += dx + pullX; cy += dy + pullY;
+      cx = Math.max(W*0.15, Math.min(W*0.65, cx));
+      cy = Math.max(H*0.15, Math.min(H*0.75, cy));
+      conservTrajectory.push({ x: cx, y: cy });
+    }
+    trajectoryBuilt = true;
+  }
+
+  buildTrajectories();
+  let animStart = performance.now();
+
+  startAnimation('scene6', (t) => {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw contour map
+    const step = 12;
+    for (let x = 0; x < W; x += step) {
+      for (let y = 0; y < H; y += step) {
+        const h = height(x, y);
+        const r = Math.floor(h * 40);
+        const g = Math.floor(h * 80 + 20);
+        const b = Math.floor(h * 120 + 40);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x, y, step, step);
+      }
+    }
+
+    // Contour lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 0.5;
+    for (let level = 0; level < 1; level += 0.1) {
+      ctx.beginPath();
+      for (let x = 0; x < W; x += 4) {
+        for (let y = 0; y < H; y += 4) {
+          const h = height(x, y);
+          if (Math.abs(h - level) < 0.03) {
+            ctx.moveTo(x, y);
+            ctx.arc(x, y, 1, 0, Math.PI*2);
+          }
+        }
+      }
+      ctx.stroke();
+    }
+
+    // Training data
+    dataPoints.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fill();
+    });
+
+    const elapsed = (t - animStart) / 1000;
+
+    if (landscapeMode === 'sample') {
+      // Drop sample points near data
+      if (Math.random() < 0.05 && samplePoints.length < 40) {
+        const base = dataPoints[Math.floor(Math.random()*dataPoints.length)];
+        samplePoints.push({
+          x: base.x + (Math.random()-0.5)*60,
+          y: base.y + (Math.random()-0.5)*60,
+          age: 0
+        });
+      }
+      samplePoints.forEach(p => {
+        p.age++;
+        const alpha = Math.min(1, p.age/20) * 0.7;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(0,212,255,${alpha})`;
+        ctx.fill();
+      });
+      if (samplePoints.length > 40) samplePoints.shift();
+
+      // Label
+      ctx.font = '11px JetBrains Mono';
+      ctx.fillStyle = 'rgba(0,212,255,0.6)';
+      ctx.textAlign = 'left';
+      ctx.fillText('● samples cluster near data', 10, 20);
+    }
+
+    if (landscapeMode === 'optimize') {
+      const steps = Math.min(optimTrajectory.length, Math.floor(elapsed * 8));
+      // Draw trajectory
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(255,68,102,0.8)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < steps; i++) {
+        if (i === 0) ctx.moveTo(optimTrajectory[i].x, optimTrajectory[i].y);
+        else ctx.lineTo(optimTrajectory[i].x, optimTrajectory[i].y);
+      }
+      ctx.stroke();
+
+      // Current point
+      if (steps > 0) {
+        const p = optimTrajectory[steps-1];
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+        ctx.fillStyle = '#ff4466';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 12, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(255,68,102,0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Warning zone
+      if (steps > 15) {
+        const p = optimTrajectory[steps-1];
+        ctx.font = '12px Inter';
+        ctx.fillStyle = 'rgba(255,68,102,0.8)';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠ adversarial region', p.x, p.y - 20);
+      }
+
+      ctx.font = '11px JetBrains Mono';
+      ctx.fillStyle = 'rgba(255,68,102,0.6)';
+      ctx.textAlign = 'left';
+      ctx.fillText('● gradient goes off-distribution', 10, 20);
+    }
+
+    if (landscapeMode === 'conservative') {
+      const steps = Math.min(conservTrajectory.length, Math.floor(elapsed * 6));
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(68,255,136,0.8)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < steps; i++) {
+        if (i === 0) ctx.moveTo(conservTrajectory[i].x, conservTrajectory[i].y);
+        else ctx.lineTo(conservTrajectory[i].x, conservTrajectory[i].y);
+      }
+      ctx.stroke();
+
+      if (steps > 0) {
+        const p = conservTrajectory[steps-1];
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+        ctx.fillStyle = '#44ff88';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 12, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(68,255,136,0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Data boundary
+      ctx.beginPath();
+      ctx.ellipse(W*0.4, H*0.45, W*0.22, H*0.3, 0, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(68,255,136,0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4,4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.font = '11px JetBrains Mono';
+      ctx.fillStyle = 'rgba(68,255,136,0.6)';
+      ctx.textAlign = 'left';
+      ctx.fillText('● stays near data, finds best within', 10, 20);
+    }
+  });
+}
+
+// ============================================
+// SCENE 7: Convergence animation
+// ============================================
+function scene7Enter() {
+  const rows = document.querySelectorAll('#convergence-diagram .thread-row');
+  rows.forEach((row, i) => {
+    setTimeout(() => row.classList.add('visible'), parseInt(row.dataset.delay));
+  });
+  setTimeout(() => document.getElementById('merge-arrow').classList.add('visible'), 900);
+  setTimeout(() => document.getElementById('result-box').classList.add('visible'), 1100);
+
+  // Pipeline
+  document.querySelectorAll('#pipeline .pipe-block, #pipeline .pipe-arrow').forEach(el => {
+    setTimeout(() => el.classList.add('visible'), parseInt(el.dataset.delay));
+  });
+}
+
+function scene7Exit() {
+  document.querySelectorAll('#convergence-diagram .thread-row').forEach(r => r.classList.remove('visible'));
+  document.getElementById('merge-arrow').classList.remove('visible');
+  document.getElementById('result-box').classList.remove('visible');
+  document.querySelectorAll('#pipeline .pipe-block, #pipeline .pipe-arrow').forEach(el => el.classList.remove('visible'));
+}
+
+// ============================================
+// SCENE 8: Results bar chart
+// ============================================
+let resultMetric = 'energy';
+
+const resultData = {
+  energy: [
+    { name: 'Crystal\nFormer', value: 0.71, color: 'rgba(255,170,51,0.7)' },
+    { name: 'DiffCSP', value: 0.59, color: 'rgba(255,170,51,0.7)' },
+    { name: 'DiffCSP++', value: 0.65, color: 'rgba(255,170,51,0.7)' },
+    { name: 'Matter\nGen', value: 0.60, color: 'rgba(255,170,51,0.7)' },
+    { name: 'Clique\nFlowmer', value: -0.81, color: 'rgba(0,212,255,0.8)' },
+    { name: 'CF\nTop', value: -0.99, color: 'rgba(68,255,136,0.8)' },
+  ],
+  bandgap: [
+    { name: 'Crystal\nFormer', value: 0.48, color: 'rgba(255,170,51,0.7)' },
+    { name: 'DiffCSP', value: 0.63, color: 'rgba(255,170,51,0.7)' },
+    { name: 'DiffCSP++', value: 0.60, color: 'rgba(255,170,51,0.7)' },
+    { name: 'Matter\nGen', value: 0.57, color: 'rgba(255,170,51,0.7)' },
+    { name: 'Clique\nFlowmer', value: 0.03, color: 'rgba(0,212,255,0.8)' },
+    { name: 'CF\nTop', value: 0.03, color: 'rgba(68,255,136,0.8)' },
+  ]
+};
+
+function setResultMetric(metric) {
+  resultMetric = metric;
+  document.querySelectorAll('#scene-8 .btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(metric === 'energy' ? 'formation' : 'band')));
+  renderResultChart();
+  const insight = document.getElementById('result-insight');
+  if (metric === 'energy') {
+    insight.innerHTML = 'Generative models cluster around <span style="color:var(--warn)">0.6</span>. CliqueFlowmer reaches <span style="color:var(--success)">−0.99</span> — materials more stable than their raw elements.';
+  } else {
+    insight.innerHTML = 'Generative models spread around <span style="color:var(--warn)">0.5</span>. CliqueFlowmer drives to <span style="color:var(--success)">0.03</span> — near-metallic behavior.';
+  }
+}
+
+function renderResultChart() {
+  const chart = document.getElementById('result-chart');
+  const data = resultData[resultMetric];
+
+  // Find range for scaling
+  const minVal = Math.min(...data.map(d => d.value));
+  const maxVal = Math.max(...data.map(d => d.value));
+  const range = maxVal - minVal || 1;
+
+  chart.innerHTML = '';
+  data.forEach((d, i) => {
+    const group = document.createElement('div');
+    group.className = 'bar-group';
+
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.background = d.color;
+    // Normalize: 0 line in the middle, bars grow from there
+    const maxH = 180;
+    const zeroLine = (maxVal / range) * maxH;
+    let barH, barBottom;
+    if (d.value >= 0) {
+      barH = (d.value / range) * maxH;
+      bar.style.height = '0px';
+      bar.style.marginBottom = (maxH - zeroLine) + 'px';
+    } else {
+      barH = (-d.value / range) * maxH;
+      bar.style.height = '0px';
+      bar.style.marginBottom = (maxH - zeroLine - barH) + 'px';
+      bar.style.borderRadius = '0 0 4px 4px';
+    }
+
+    const value = document.createElement('div');
+    value.className = 'bar-value';
+    value.style.color = d.value < 0 ? 'var(--success)' : 'var(--text-dim)';
+    value.textContent = d.value.toFixed(2);
+    bar.appendChild(value);
+
+    const label = document.createElement('div');
+    label.className = 'bar-label';
+    label.style.whiteSpace = 'pre-line';
+    label.textContent = d.name;
+
+    group.appendChild(bar);
+    group.appendChild(label);
+    chart.appendChild(group);
+
+    // Animate
+    setTimeout(() => { bar.style.height = barH + 'px'; }, 100 + i * 100);
+  });
+}
+
+// ============================================
+// SCENE 9: Frontier particles
+// ============================================
+function scene9Enter() {
+  const ctx = getCtx('bg-canvas-9');
+  if (!ctx) return;
+  const particles = [];
+  for (let i = 0; i < 100; i++) {
+    particles.push({
+      x: Math.random() * ctx.W,
+      y: Math.random() * ctx.H,
+      r: Math.random() * 2 + 0.5,
+      a: Math.random() * 0.3,
+      vy: -(Math.random() * 0.3 + 0.1),
+      vx: (Math.random() - 0.5) * 0.2,
+      hue: Math.random() * 60 + 170 // cyan to blue
+    });
+  }
+  startAnimation('scene9', (t) => {
+    ctx.clearRect(0, 0, ctx.W, ctx.H);
+    // Gradient background
+    const grad = ctx.createLinearGradient(0, 0, 0, ctx.H);
+    grad.addColorStop(0, 'rgba(8,8,26,0)');
+    grad.addColorStop(0.7, 'rgba(0,30,60,0.1)');
+    grad.addColorStop(1, 'rgba(0,60,120,0.05)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, ctx.W, ctx.H);
+
+    particles.forEach(p => {
+      p.y += p.vy;
+      p.x += p.vx;
+      if (p.y < -10) { p.y = ctx.H + 10; p.x = Math.random() * ctx.W; }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = `hsla(${p.hue},80%,60%,${p.a})`;
+      ctx.fill();
+    });
+  });
+}
+
+// ============================================
+// SCENE LIFECYCLE
+// ============================================
+function enterScene(idx) {
+  switch(idx) {
+    case 0: scene0Enter(); break;
+    case 1: scene1Enter(); break;
+    case 2: scene2Enter(); break;
+    case 4: scene4Enter(); break;
+    case 5: scene5Enter(); break;
+    case 6: scene6Enter(); break;
+    case 7: scene7Enter(); break;
+    case 8: renderResultChart(); break;
+    case 9: scene9Enter(); break;
+  }
+}
+
+function exitScene(idx) {
+  stopAnimation('scene0');
+  stopAnimation('scene1');
+  stopAnimation('scene2');
+  stopAnimation('scene4');
+  stopAnimation('scene5');
+  stopAnimation('scene6');
+  stopAnimation('scene9');
+  if (idx === 7) scene7Exit();
+  // Clean up sample points
+  if (idx === 6) { samplePoints = []; }
+  // Clean up timeline nodes
+  document.querySelectorAll('.timeline-node').forEach(n => n.classList.remove('lit'));
+}
+
+// Init
+document.getElementById('nav-prev').disabled = true;
+document.getElementById('progress').style.width = '0%';
+scene0Enter();
+</script>
+</body>
+</html>
