@@ -508,10 +508,12 @@ class CliqueFlowmer(nn.Module):
 
         #
         # Compute unconstrained prediction and factorization gap
+        # h(z.detach()) trains h without affecting the encoder
+        # Factorization gap uses non-detached z so encoder gradient flows when alpha_fact > 0
         #
-        pred_unconstrained = self.predict_unconstrained(z)
+        pred_unconstrained = self.predict_unconstrained(z.detach())
         unconstrained_error = (pred_unconstrained.view(-1) - target.view(-1))**2
-        factorization_gap = (pred_unconstrained.view(-1) - pred.view(-1))**2
+        factorization_gap = (self.predict_unconstrained(z).view(-1) - pred.view(-1))**2
 
         #
         # Compute individual losses
