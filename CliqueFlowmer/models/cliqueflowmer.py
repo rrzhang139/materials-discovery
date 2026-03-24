@@ -200,7 +200,8 @@ class CliqueFlowmer(nn.Module):
                 n_blocks=2, n_heads=2, n_mlp=2, mlp_dim=2 * (256,), dropout_rate=0.1, 
                 submodule=ops.SwiGLU, act = nn.GELU(), alpha_vae=1, alpha_mse=1, beta_mse=0, temp_atom=1, 
                 temp_flow=1, warmup=1e4, lr=3e-4, polyak_tau=5e-3, temp_distance=0., drop_type=0.1, drop_latent=0.1,
-                lower_percentile=None, upper_percentile=None, initial_length_dist=None, use_flat_flow=False):
+                lower_percentile=None, upper_percentile=None, initial_length_dist=None, use_flat_flow=False,
+                alpha_fact=0):
 
         super().__init__()
 
@@ -220,6 +221,8 @@ class CliqueFlowmer(nn.Module):
         flow_class = FlatFlow if use_flat_flow else Flow
         self.geo_flow = flow_class(transformer_dim, n_blocks, n_heads, n_cliques, clique_dim, knot_dim, n_registers, dropout_rate, submodule, act, initial_length_dist=initial_length_dist)
         self.regressor = backbones.DMLP(n_cliques, clique_dim, mlp_dim, n_mlp, dropout_rate, act)
+        self.unconstrained_regressor = backbones.UnconstrainedMLP(self.latent_dim, mlp_dim, n_mlp, dropout_rate, act)
+        self.alpha_fact = alpha_fact
         self.optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=0.01)
         self.scheduler = ops.linear_warmup_decay(
             self.optimizer,
@@ -373,7 +376,10 @@ class CliqueFlowmer(nn.Module):
 
     def predict(self, z):
         z = graphops.separate_latents(z, self.index_matrix.to(z.device))
-        return self.regressor(z) 
+        return self.regressor(z)
+
+    def predict_unconstrained(self, z):
+        return self.unconstrained_regressor(z)
 
     def vae(self, abc, angles, atomic, pos, mask):
         #
@@ -501,6 +507,13 @@ class CliqueFlowmer(nn.Module):
         error = (pred.view(-1) - target.view(-1))**2
 
         #
+        # Compute unconstrained prediction and factorization gap
+        #
+        pred_unconstrained = self.predict_unconstrained(z)
+        unconstrained_error = (pred_unconstrained.view(-1) - target.view(-1))**2
+        factorization_gap = (pred_unconstrained.view(-1) - pred.view(-1))**2
+
+        #
         # Compute individual losses
         #
         kl_loss = flow_weight * info['kl']
@@ -525,7 +538,11 @@ class CliqueFlowmer(nn.Module):
         temp_flow = self.temp_flow
         temp_atom = self.temp_atom
 
-        loss = world_size * (temp_kl * kl_loss + temp_mse * error_loss + temp_lattice * (abc_loss + angles_loss) + temp_flow * pos_loss + temp_atom * atom_loss).sum()
+        unconstrained_loss = flow_weight * unconstrained_error
+        fact_loss = flow_weight * factorization_gap
+        temp_fact = self.alpha_fact * self.beta_mse * self.beta_vae
+
+        loss = world_size * (temp_kl * kl_loss + temp_mse * error_loss + temp_mse * unconstrained_loss + temp_fact * fact_loss + temp_lattice * (abc_loss + angles_loss) + temp_flow * pos_loss + temp_atom * atom_loss).sum()
         loss.backward()
         
         torch.nn.utils.clip_grad_norm_(self.encoder.parameters(), 1)
@@ -533,6 +550,7 @@ class CliqueFlowmer(nn.Module):
         torch.nn.utils.clip_grad_norm_(self.geo_flow.parameters(), 1)        
         torch.nn.utils.clip_grad_norm_(self.modulator.parameters(), 1)
         torch.nn.utils.clip_grad_norm_(self.regressor.parameters(), 1)
+        torch.nn.utils.clip_grad_norm_(self.unconstrained_regressor.parameters(), 1)
 
         self.optimizer.step()
         self.optimizer.zero_grad()
@@ -569,8 +587,11 @@ class CliqueFlowmer(nn.Module):
         info['error_angles'] = info['error_angles'].mean()
         info['error_pos'] = info['error_pos'].mean()
         info['atom_log_prob'] = info['atom_log_prob'].mean()
+        info['factorization_gap'] = factorization_gap.mean()
+        info['unconstrained_mae'] = torch.abs(pred_unconstrained.detach().view(-1) - target.view(-1)).mean()
+        info['unconstrained_mse'] = unconstrained_error.mean()
 
-        return info 
+        return info
 
     def eval_step(self, abc, angles, atomic, pos, mask, target, world_size=1):
         #
@@ -600,7 +621,14 @@ class CliqueFlowmer(nn.Module):
             error = (pred.view(-1) - target.view(-1))**2
 
             #
-            # Calculate the loss 
+            # Compute unconstrained prediction and factorization gap
+            #
+            pred_unconstrained = self.predict_unconstrained(z)
+            unconstrained_error = (pred_unconstrained.view(-1) - target.view(-1))**2
+            factorization_gap = (pred_unconstrained.view(-1) - pred.view(-1))**2
+
+            #
+            # Calculate the loss
             #
             temp_kl = self.alpha_vae * self.beta_vae
             temp_mse = self.alpha_mse * self.beta_mse * self.beta_vae
@@ -629,8 +657,11 @@ class CliqueFlowmer(nn.Module):
         info['error_angles'] = info['error_angles'].mean()
         info['error_pos'] = info['error_pos'].mean()
         info['atom_log_prob'] = info['atom_log_prob'].mean()
+        info['factorization_gap'] = factorization_gap.mean()
+        info['unconstrained_mae'] = torch.abs(pred_unconstrained.view(-1) - target.view(-1)).mean()
+        info['unconstrained_mse'] = unconstrained_error.mean()
 
         self.train()
 
-        return info 
+        return info
 

@@ -33,7 +33,7 @@ def load_model_state_dict(path, model):
     if not os.path.exists(path):
         return None
 
-    model.load_state_dict(torch.load(path, map_location='cpu'))
+    model.load_state_dict(torch.load(path, map_location='cpu'), strict=False)
     return model
 
 

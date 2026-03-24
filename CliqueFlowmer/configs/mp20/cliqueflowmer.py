@@ -32,7 +32,8 @@ def get_config():
         'drop_latent': 0.1, 
         'submodule': ops.SwiGLU, 
         'act': nn.GELU(),
-        'lr': 1.4e-4
+        'lr': 1.4e-4,
+        'alpha_fact': 0
     }
 
     config.data = {

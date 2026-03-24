@@ -52,6 +52,43 @@ class DMLP(nn.Module):
         return x.sum(-1)
 
 
+class UnconstrainedMLP(nn.Module):
+    """MLP that predicts a scalar from the full (flat) latent vector.
+    Used as the unconstrained predictor h(z) for factorization gap measurement."""
+
+    def __init__(self, input_dim, model_dim, n_layers, dropout_rate=0.1, act=nn.GELU()):
+
+        super().__init__()
+        self.layers = nn.Sequential()
+
+        dims = (input_dim,) + n_layers * (model_dim,)
+
+        for i in range(n_layers):
+
+            layer = nn.Sequential(
+                nn.Linear(dims[i], dims[i+1]), act
+            )
+
+            if i + 1 < n_layers:
+                layer.append(nn.LayerNorm(dims[i+1]))
+                layer.append(nn.Dropout(dropout_rate))
+
+            self.layers.append(layer)
+
+        self.proj = nn.Linear(dims[-1], 1)
+
+    def forward(self, x):
+
+        scale = 1 / math.sqrt(len(self.layers))
+
+        for i, layer in enumerate(self.layers):
+
+            v = layer(x)
+            x = x + scale * v if i > 0 else v
+
+        return self.proj(x).squeeze(-1)
+
+
 class PMLP(nn.Module):
 
     def __init__(self, n_input, input_dim, output_dim, model_dim, n_layers, dropout_rate= 0.1, act=nn.GELU()):
