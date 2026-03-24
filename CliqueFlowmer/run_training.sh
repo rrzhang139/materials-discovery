@@ -61,8 +61,14 @@ fi
 
 wandb login "$WANDB_API_KEY" 2>/dev/null
 
+echo "[$(date)] === PRE-WARM CACHES (avoids multi-GPU race conditions) ==="
+mkdir -p /root/.dgl && echo '{"backend":"pytorch"}' > /root/.dgl/config.json
+rm -rf /root/.cache/matgl
+python -c "from matgl import load_model; load_model('M3GNet-MP-2018.6.1-Eform'); load_model('MEGNet-MP-2019.4.1-BandGap-mfi'); print('matgl+dgl caches warmed')"
+export DGLBACKEND=pytorch
+
 echo "[$(date)] === DDP TEST (1 epoch) ==="
-PYTHONUNBUFFERED=1 CUDA_VISIBLE_DEVICES=$(seq -s, 0 $((NGPU-1))) torchrun \
+DGLBACKEND=pytorch PYTHONUNBUFFERED=1 CUDA_VISIBLE_DEVICES=$(seq -s, 0 $((NGPU-1))) torchrun \
     --nproc_per_node=$NGPU --nnodes=1 --node_rank=0 \
     --master_addr=localhost --master_port=12346 \
     train.py --N_epochs=1 --N_eval=3 --N_save=100 --batch_size=$BATCH_SIZE > /workspace/test.log 2>&1
@@ -77,7 +83,7 @@ echo "DDP TEST PASSED"
 
 echo "[$(date)] === FULL TRAINING: $N_EPOCHS epochs, $NGPU GPU, bs=$BATCH_SIZE ==="
 rm -f models/states/CliqueFlowmer/mp20/checkpoint.pth
-PYTHONUNBUFFERED=1 CUDA_VISIBLE_DEVICES=$(seq -s, 0 $((NGPU-1))) torchrun \
+DGLBACKEND=pytorch PYTHONUNBUFFERED=1 CUDA_VISIBLE_DEVICES=$(seq -s, 0 $((NGPU-1))) torchrun \
     --nproc_per_node=$NGPU --nnodes=1 --node_rank=0 \
     --master_addr=localhost --master_port=12346 \
     train.py --batch_size=$BATCH_SIZE --N_epochs=$N_EPOCHS --N_eval=100 --N_save=10000
