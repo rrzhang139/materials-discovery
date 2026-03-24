@@ -18,7 +18,7 @@ import models.graphops as graphops
 import data.tools as tools
 import saving
 
-from matbench.bench import MatbenchBenchmark
+# from matbench.bench import MatbenchBenchmark  # unused, install conflicts
 
 FLAGS = flags.FLAGS
 
@@ -70,7 +70,7 @@ def main(_):
     #
     # Build model spec string for saving
     #
-    model_spec = ', '.join([f'{key}: {value}' for key, value in model_kwargs.items()])
+    model_spec = 'checkpoint'
 
     #
     # Extract specific kwargs
