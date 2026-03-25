@@ -23,7 +23,7 @@ def get_config():
         'alpha_vae': 1e-4,
         'alpha_mse': 1,
         'beta_mse': 1e-4,
-        'warmup': 1e5,
+        'warmup': 1.25e4,       # 1e5 / 8 — same data volume per warmup phase
         'temp_atom': 1,
         'temp_flow': 16,
         'mle_prior': True,
@@ -32,7 +32,7 @@ def get_config():
         'drop_latent': 0.1,
         'submodule': ops.SwiGLU,
         'act': nn.GELU(),
-        'lr': 1.4e-4,
+        'lr': 1.12e-3,         # 1.4e-4 * 8 — linear scaling for 8x batch
         'alpha_fact': 0.1
     }
 
