@@ -33,7 +33,7 @@ def get_config():
         'alpha_vae': 1e-4,
         'alpha_mse': 1,
         'beta_mse': 1e-4,
-        'warmup': 700,            # 15% of total steps (4689). Paper: 1e5/650K=15%
+        'warmup': 700,            # 15% of total steps (4689) — but this config has batch=16384 which OOMs. Use cliqueflowmer_fact.py instead.
         'temp_atom': 1,
         'temp_flow': 16,
         'mle_prior': True,
