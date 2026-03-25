@@ -23,7 +23,7 @@ def get_config():
         'alpha_vae': 1e-4,
         'alpha_mse': 1,
         'beta_mse': 1e-4,
-        'warmup': 1.25e4,       # 1e5 / 8 — same data volume per warmup phase
+        'warmup': 1400,          # 15% of total steps (9375). Paper: 1e5/650K=15%
         'temp_atom': 1,
         'temp_flow': 16,
         'mle_prior': True,
@@ -34,8 +34,9 @@ def get_config():
         'act': nn.GELU(),
         'lr': 1.12e-3,         # 1.4e-4 * 8 — linear scaling for 8x batch
         'alpha_fact': 0.1
-        # NOTE: With 8x batch, use N_epochs=3125 (25000/8) to match paper's
-        # total gradient updates. Run with: --N_epochs=3125 --batch_size=8192
+        # With 8x batch: N_epochs=3125, total=9375 steps, warmup=1400 (15%/phase)
+        # Phase 1 (recon): 0-1400, Phase 2 (pred+h(z)): 1400-2800, Phase 3 (fact gap): 2800-4200
+        # Run: --N_epochs=3125 --batch_size=8192 --config=configs/mp20/cliqueflowmer_fact.py
     }
 
     config.data = {

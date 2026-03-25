@@ -13,13 +13,16 @@
 #
 # Batch size scaling: when increasing BATCH_SIZE by Nx, also:
 #   - Scale lr by Nx (linear scaling rule)
-#   - Scale warmup by 1/Nx (same data volume per phase)
 #   - Scale N_EPOCHS by 1/Nx (same total gradient updates)
+#   - Scale warmup to 15% of new total steps (NOT by 1/Nx of old warmup!)
+#     Paper: warmup=1e5 out of 650K steps = 15% per phase
 #   - Max BATCH_SIZE with 8 GPUs: 8192 (val set has only 9047 samples)
 #
-# Example: 8x batch
+# Example: 8x batch on 8 GPUs
+#   Total steps: 3125 epochs × 3 steps/epoch = 9375
+#   warmup: 15% × 9375 = 1400 per phase
 #   BATCH_SIZE=8192 N_EPOCHS=3125 bash run_training.sh
-#   (use cliqueflowmer_fact.py config which has lr=1.12e-3, warmup=1.25e4)
+#   (use cliqueflowmer_fact.py which has lr=1.12e-3, warmup=1400)
 #
 # Pipeline: clone → install → data → DDP test → full train → upload → terminate
 
