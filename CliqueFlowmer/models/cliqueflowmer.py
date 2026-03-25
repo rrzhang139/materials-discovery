@@ -543,9 +543,11 @@ class CliqueFlowmer(nn.Module):
 
         unconstrained_loss = flow_weight * unconstrained_error
         fact_loss = flow_weight * factorization_gap
+        # h(z) only trains in phase 2+ (beta_vae=1, latent is stable)
+        temp_unconst = self.alpha_mse * self.beta_mse * float(self.beta_vae >= 1)
         temp_fact = self.alpha_fact * self.beta_fact
 
-        loss = world_size * (temp_kl * kl_loss + temp_mse * error_loss + temp_mse * unconstrained_loss + temp_fact * fact_loss + temp_lattice * (abc_loss + angles_loss) + temp_flow * pos_loss + temp_atom * atom_loss).sum()
+        loss = world_size * (temp_kl * kl_loss + temp_mse * error_loss + temp_unconst * unconstrained_loss + temp_fact * fact_loss + temp_lattice * (abc_loss + angles_loss) + temp_flow * pos_loss + temp_atom * atom_loss).sum()
         loss.backward()
         
         torch.nn.utils.clip_grad_norm_(self.encoder.parameters(), 1)
