@@ -598,6 +598,12 @@ class CliqueFlowmer(nn.Module):
         info['factorization_gap'] = factorization_gap.mean()
         info['unconstrained_mae'] = torch.abs(pred_unconstrained.detach().view(-1) - target.view(-1)).mean()
         info['unconstrained_mse'] = unconstrained_error.mean()
+        info['unconstrained_r2'] = tools.r2(pred_unconstrained.detach().view(-1), target.view(-1))
+        info['beta_vae'] = torch.tensor(self.beta_vae)
+        info['beta_mse'] = torch.tensor(self.beta_mse)
+        info['beta_fact'] = torch.tensor(self.beta_fact)
+        info['temp_unconst'] = torch.tensor(temp_unconst)
+        info['temp_fact'] = torch.tensor(temp_fact)
 
         return info
 
