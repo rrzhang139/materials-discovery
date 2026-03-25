@@ -7,9 +7,19 @@
 #   RUNPOD_API_KEY — required for auto-terminate
 #   POD_ID         — required for auto-terminate
 #   NGPU_OVERRIDE  — override GPU count (default: auto-detect)
-#   BATCH_SIZE     — per-GPU batch size (default: 1024)
+#   BATCH_SIZE     — GLOBAL batch size (divided by world_size internally) (default: 1024)
 #   N_EPOCHS       — number of epochs (default: 25000)
 #   BRANCH         — git branch (default: factorization-loss)
+#
+# Batch size scaling: when increasing BATCH_SIZE by Nx, also:
+#   - Scale lr by Nx (linear scaling rule)
+#   - Scale warmup by 1/Nx (same data volume per phase)
+#   - Scale N_EPOCHS by 1/Nx (same total gradient updates)
+#   - Max BATCH_SIZE with 8 GPUs: 8192 (val set has only 9047 samples)
+#
+# Example: 8x batch
+#   BATCH_SIZE=8192 N_EPOCHS=3125 bash run_training.sh
+#   (use cliqueflowmer_fact.py config which has lr=1.12e-3, warmup=1.25e4)
 #
 # Pipeline: clone → install → data → DDP test → full train → upload → terminate
 

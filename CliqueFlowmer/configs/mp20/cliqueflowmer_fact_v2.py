@@ -7,10 +7,14 @@ import architectures.ops as ops
 def get_config():
     """Factorization experiment v2: max batch, phase-2 gated h(z) training.
 
+    NOTE: batch=16384 exceeded val set capacity (9047/8=1131 < 2048/GPU).
+    Use cliqueflowmer_fact.py (batch=8192) instead, or reduce batch here.
+
     Scaling from paper baseline (batch=1024, lr=1.4e-4, warmup=1e5):
       batch 1024 → 16384 (16x)
       lr    1.4e-4 → 2.24e-3 (linear scaling)
       warmup 1e5 → 6250 (same data volume per phase)
+      epochs: use N_epochs=1563 (25000/16) to match total gradient updates
     """
     config = ml_collections.ConfigDict()
 

@@ -34,6 +34,8 @@ def get_config():
         'act': nn.GELU(),
         'lr': 1.12e-3,         # 1.4e-4 * 8 — linear scaling for 8x batch
         'alpha_fact': 0.1
+        # NOTE: With 8x batch, use N_epochs=3125 (25000/8) to match paper's
+        # total gradient updates. Run with: --N_epochs=3125 --batch_size=8192
     }
 
     config.data = {
