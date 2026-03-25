@@ -233,10 +233,11 @@ class CliqueFlowmer(nn.Module):
         self.target_regressor = deepcopy(self.regressor)
 
         self.index_matrix = self.encoder.index_matrix
-        self.alpha_vae = alpha_vae 
-        self.alpha_mse = alpha_mse 
+        self.alpha_vae = alpha_vae
+        self.alpha_mse = alpha_mse
         self.beta_vae = 0
-        self.beta_mse = beta_mse 
+        self.beta_mse = beta_mse
+        self.beta_fact = 0
         self.temp_atom = temp_atom
         self.temp_flow = temp_flow
         self.warmup = warmup
@@ -542,7 +543,7 @@ class CliqueFlowmer(nn.Module):
 
         unconstrained_loss = flow_weight * unconstrained_error
         fact_loss = flow_weight * factorization_gap
-        temp_fact = self.alpha_fact * self.beta_mse * self.beta_vae
+        temp_fact = self.alpha_fact * self.beta_fact
 
         loss = world_size * (temp_kl * kl_loss + temp_mse * error_loss + temp_mse * unconstrained_loss + temp_fact * fact_loss + temp_lattice * (abc_loss + angles_loss) + temp_flow * pos_loss + temp_atom * atom_loss).sum()
         loss.backward()
@@ -570,6 +571,9 @@ class CliqueFlowmer(nn.Module):
 
         if self.beta_vae >= 1:
             self.beta_mse = min(1, self.beta_mse + 1 / self.warmup)
+
+        if self.beta_mse >= 1 and self.alpha_fact > 0:
+            self.beta_fact = min(1, self.beta_fact + 1 / self.warmup)
 
         #
         # Take some stats for logging
